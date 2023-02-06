@@ -5,17 +5,14 @@ USE employees_db;
 
 CREATE TABLE department (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(30) NOT NULL --holds department name
+  name VARCHAR(30) NOT NULL 
 );
 
-CREATE TABLE role (
+CREATE TABLE roles (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(30) NOT NULL,
-    salary DECIMAL NOT NULL,
-    department_id INT NOT NULL,
-    FOREIGN KEY (department_id)
-    REFERENCES department(id)
-    ON DELETE SET NULL --do we not need this
+    title VARCHAR(45) NOT NULL,
+    salary DECIMAL (10,2),
+    department_id INT NOT NULL
 );
 
 CREATE TABLE employee (
