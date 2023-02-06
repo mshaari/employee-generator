@@ -1,7 +1,6 @@
 const mysql = require('mysql2');
 const inquirer = require('inquirer');
 const consoleTable = require('console.table');
-const express = require('express');
 
 // Connect to database
 const connection = mysql.createConnection(
@@ -36,8 +35,7 @@ const InquirerPrompt = () => {
                 'Add department',
                 'Add role',
                 'Add employee',
-                'Update all departments',
-                'Update employee infomation',
+                'Update employee role', //need to work on this
                 'Exit'
             ]
         }
@@ -67,15 +65,11 @@ const InquirerPrompt = () => {
             }
 
             if (choices === "Add employee") {
-                addEmployees();
+                addEmployee();
             }
 
-            if (choices === "Update all departments") {
-                allDepartments();
-            }
-
-            if (choices === "Update employee infomation") {
-                employeeInfomation();
+            if (choices === "Update employee role") {
+                updateEmployee();
             }
 
             if (choices === "Exit") {
@@ -147,7 +141,7 @@ addRoles = () => {
 
                         connection.query(mysql, parameters, (err, result) => {
                             if (err) return console.log(err);
-                            console.log('Added' + answer.roles + "to roles");
+                            console.log('Added ' + answer.roles + ' to roles');
                             showRoles();
                         });
                     });
@@ -158,7 +152,7 @@ addRoles = () => {
 //show employees
 showEmployees = () => {
     console.log('All employees are showing.');
-    const mysql = `SELECT employee.id, employee.first_name, employee.last_name, roles.title, department.name AS department, roles.salary, CONCAT(mgr.first_name, ' ', mgr.last_name) AS manager FROM employee LEFT JOIN roles ON employee.role_id = roles.id LEFT JOIN department ON roles.department_id = department.id LEFT JOIN employee mgr ON employee.manager_id = mgr.id`;
+    const mysql = `SELECT employee.id, employee.first_name, employee.last_name, roles.title, department.name AS department, roles.salary, CONCAT(mgr.first_name, ' ', mgr.last_name) AS manager FROM employee LEFT JOIN roles ON employee.role_id = roles.id LEFT JOIN department ON roles.department_id = department.id LEFT JOIN employee mgr ON employee.manager_id = mgr.id`; //NEED TO GO OVER WHAT THIS MEANS.
 
     connection.query(mysql, (err, rows) => {
         if (err) return console.log(err);
@@ -180,7 +174,7 @@ updateEmployee = () => {
                 type: 'list',
                 name: 'name',
                 message: 'Which employee do we want to update?',
-                choices: employees
+                choices: employee
             }
         ])
             .then(employeeChoice => {
@@ -188,7 +182,7 @@ updateEmployee = () => {
                 const parameters = [];
                 parameters.push(employee);
 
-                const role_var = `SELECT * FROM role`;
+                const role_var = `SELECT * FROM roles`;
 
                 connection.query(role_var, (err, data) => {
                     if (err) return console.log(err);
@@ -221,3 +215,69 @@ updateEmployee = () => {
             })
     })
 };
+//Update/ADD Department
+addDepartments = () => {
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'department',
+            message: 'What department do you want to add?',
+        }
+    ]).then(answer => {
+        const mysql = `INSERT INTO department (name) VALUES (?)`;
+        connection.query(mysql, answer.department, (err, results) => {
+            if (err) return console.log(err);
+            console.log('Added' + answer.department + "to departments");
+
+            showDepartments();
+        });
+    });
+}
+//Add employee
+addEmployee = ()  => {
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'first_name',
+            message: `Employee's first name?`,
+        },
+        {
+            type: 'input',
+            name: 'last_name',
+            message: `Employee's last name?`,
+        }
+    ]).then(answer => {
+        const parameters = [answer.first_name, answer.last_name]
+
+        connection.query(`SELECT roles.id, roles.title, employee.first_name, employee.last_name, employee.id FROM roles, employee`, (err, data) => {
+            if (err) throw err;
+            const roles = data.map(({ id, title }) => ({ name:title, value:id}));
+            const employees = data.map(({ id, first_name, last_name }) => ({ name: first_name + " " + last_name, value: id}));
+
+            inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'role',
+                    message: 'What is your role?',
+                    choices: roles
+                },
+                {
+                    type: 'list',
+                    name: 'manager',
+                    message: `Who is the employee's manager`,
+                    choices: employees
+                }
+            ]).then(selectedRole => {
+                const role = selectedRole.role;
+                const manager = selectedRole.manager;
+                parameters.push(role);
+                parameters.push(manager);
+
+                connection.query(`INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`, parameters, function(err, res) {
+                    if (err) throw err;
+                    showEmployees();
+                }); 
+            });
+        });
+    });
+}
