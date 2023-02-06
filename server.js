@@ -3,7 +3,7 @@ const inquirer = require('inquirer');
 const consoleTable = require('console.table');
 
 // Connect to database
-const connection = mysql.createConnection(
+const db = mysql.createConnection(
     {
       host: 'localhost',
       user: 'root',
@@ -16,7 +16,7 @@ const connection = mysql.createConnection(
 
 // connects to the mysql database
 
-connection.connect(function (err) {
+db.connect(function (err) {
     if (err) return console.log(err);
     InquirerPrompt();
 })
@@ -73,7 +73,7 @@ const InquirerPrompt = () => {
             }
 
             if (choices === "Exit") {
-                connection.end();
+                db.end();
             }
         });
 };
@@ -83,7 +83,7 @@ showDepartments = () => {
     console.log('All departments are showing.');
     const mysql = `SELECT department.id AS id, department.name AS department FROM department`;
 
-    connection.query(mysql, (err, rows) => {
+    db.query(mysql, (err, rows) => {
         if (err) return console.log(err);
         console.table(rows);
         InquirerPrompt();
@@ -94,9 +94,9 @@ showDepartments = () => {
 showRoles = () => {
     console.log('Show all roles.');
 
-    const mysql = `SELECT roles.id, roles.title, department.name AS department FROM roles LEFT JOIN department ON roles.department_id = department.id`;
+    const mysql = `SELECT roles.id, roles.title, roles.salary, department.name AS department FROM roles LEFT JOIN department ON roles.department_id = department.id`; // this last statement is what links the department ID from the department table to the department_id in the roles table
 
-    connection.query(mysql, (err, rows) => {
+    db.query(mysql, (err, rows) => {
         console.table(rows);
         InquirerPrompt();
     })
@@ -114,7 +114,7 @@ addRoles = () => {
         {
             type: 'input',
             name: 'salary',
-            message: 'What is your yearly salary?',
+            message: 'What is the yearly salary?',
         }
 
     ])
@@ -122,7 +122,7 @@ addRoles = () => {
             const parameters = [answer.roles, answer.salary];
             const roles_var = `SELECT name, id FROM department`;
 
-            connection.query(roles_var, (err, data) => {
+            db.query(roles_var, (err, data) => {
                 if (err) return console.log(err);
                 const department_var = data.map(({ name, id }) => ({ name: name, value: id }));
 
@@ -139,7 +139,7 @@ addRoles = () => {
                         parameters.push(department_var);
                         const mysql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`;
 
-                        connection.query(mysql, parameters, (err, result) => {
+                        db.query(mysql, parameters, (err, result) => {
                             if (err) return console.log(err);
                             console.log('Added ' + answer.roles + ' to roles');
                             showRoles();
@@ -154,7 +154,7 @@ showEmployees = () => {
     console.log('All employees are showing.');
     const mysql = `SELECT employee.id, employee.first_name, employee.last_name, roles.title, department.name AS department, roles.salary, CONCAT(mgr.first_name, ' ', mgr.last_name) AS manager FROM employee LEFT JOIN roles ON employee.role_id = roles.id LEFT JOIN department ON roles.department_id = department.id LEFT JOIN employee mgr ON employee.manager_id = mgr.id`; //NEED TO GO OVER WHAT THIS MEANS.
 
-    connection.query(mysql, (err, rows) => {
+    db.query(mysql, (err, rows) => {
         if (err) return console.log(err);
         console.table(rows);
         InquirerPrompt();
@@ -165,7 +165,7 @@ showEmployees = () => {
 updateEmployee = () => {
     const employeemysql = `SELECT * FROM employee`;
 
-    connection.query(employeemysql, (err, data) => {
+    db.query(employeemysql, (err, data) => {
 
         const employee = data.map(({ id, first_name, last_name }) => ({ name: first_name + " " + last_name, value: id }));
 
@@ -184,7 +184,7 @@ updateEmployee = () => {
 
                 const role_var = `SELECT * FROM roles`;
 
-                connection.query(role_var, (err, data) => {
+                db.query(role_var, (err, data) => {
                     if (err) return console.log(err);
                     const roles = data.map(({ id, title }) => ({ name: title, value: id }));
 
@@ -204,7 +204,7 @@ updateEmployee = () => {
                             parameters[1] = employee
                             const mysql = `UPDATE employee SET role_id = ? WHERE id = ?`;
 
-                            connection.query(mysql, parameters, (err, result) => {
+                            db.query(mysql, parameters, (err, result) => {
                                 if (err) return console.log(err);
                                 console.log('Role has been updated.');
 
@@ -215,7 +215,8 @@ updateEmployee = () => {
             })
     })
 };
-//Update/ADD Department
+
+// add department
 addDepartments = () => {
     inquirer.prompt([
         {
@@ -225,7 +226,7 @@ addDepartments = () => {
         }
     ]).then(answer => {
         const mysql = `INSERT INTO department (name) VALUES (?)`;
-        connection.query(mysql, answer.department, (err, results) => {
+        db.query(mysql, answer.department, (err, results) => {
             if (err) return console.log(err);
             console.log('Added' + answer.department + "to departments");
 
@@ -233,7 +234,8 @@ addDepartments = () => {
         });
     });
 }
-//Add employee
+
+// add employee
 addEmployee = ()  => {
     inquirer.prompt([
         {
@@ -249,37 +251,45 @@ addEmployee = ()  => {
     ]).then(answer => {
         const parameters = [answer.first_name, answer.last_name]
 
-        connection.query(`SELECT roles.id AS rolesId, roles.title AS rolesTitle, employee.first_name, employee.last_name, employee.id AS employeeId FROM roles, employee`, (err, data) => {
+        db.query(`SELECT * FROM roles`, (err, data) => {
             if (err) throw err;
-            //WHY DO THESE ALL SHOW UP FOUR TIMES?? IT'S MESSING EVERYTHING UP I THINK. IT SEEMS TO WORK IN TERMS OF BEING ABLE TO EMPLOYEES AND THINGS PROPERLY BUT I DONT KNOW WHY ITS DOING THIS
-            const roles = data.map(({ rolesId, rolesTitle }) => ({ name: rolesTitle, value: rolesId}));
-            const employees = data.map(({ employeeId, first_name, last_name }) => ({ name: first_name + " " + last_name, value: employeeId}));
-            console.log(roles);
-            console.log(employees);
+            const roles = data.map(({ id, title }) => ({ name: title, value: id}));
 
             inquirer.prompt([
                 {
                     type: 'list',
                     name: 'role',
-                    message: 'What is your role?',
+                    message: 'What is the employee role?',
                     choices: roles
-                },
-                {
-                    type: 'list',
-                    name: 'manager',
-                    message: `Who is the employee's manager`,
-                    choices: employees
                 }
-            ]).then(selectedRole => {
-                const role = selectedRole.role;
-                const manager = selectedRole.manager;
+            ]).then(answer => {
+                const role = answer.role;
                 parameters.push(role);
-                parameters.push(manager);
 
-                connection.query(`INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`, parameters, function(err, res) {
+                db.query(`SELECT * FROM employee`, (err, data) => {
                     if (err) throw err;
-                    showEmployees();
-                }); 
+                    const employees = data.map(({ first_name, last_name, id }) => ({name: first_name + ' ' + last_name, value: id }));
+
+                    console.log(employees);
+                    
+                    inquirer.prompt([
+                        {
+                            type: 'list',
+                            name: 'manager',
+                            message: 'What is the employee manager?',
+                            choices: employees
+                        }
+                    ]).then(answer => {
+                        const manager = answer.manager;
+                        parameters.push(manager);
+                        console.log(parameters);
+
+                        db.query(`INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`, parameters, function(err, res) {
+                            if (err) throw err;
+                            showEmployees();
+                        }); 
+                    })
+                })
             });
         });
     });
