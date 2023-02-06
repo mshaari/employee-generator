@@ -249,10 +249,13 @@ addEmployee = ()  => {
     ]).then(answer => {
         const parameters = [answer.first_name, answer.last_name]
 
-        connection.query(`SELECT roles.id, roles.title, employee.first_name, employee.last_name, employee.id FROM roles, employee`, (err, data) => {
+        connection.query(`SELECT roles.id AS rolesId, roles.title AS rolesTitle, employee.first_name, employee.last_name, employee.id AS employeeId FROM roles, employee`, (err, data) => {
             if (err) throw err;
-            const roles = data.map(({ id, title }) => ({ name:title, value:id}));
-            const employees = data.map(({ id, first_name, last_name }) => ({ name: first_name + " " + last_name, value: id}));
+            //WHY DO THESE ALL SHOW UP FOUR TIMES?? IT'S MESSING EVERYTHING UP I THINK. IT SEEMS TO WORK IN TERMS OF BEING ABLE TO EMPLOYEES AND THINGS PROPERLY BUT I DONT KNOW WHY ITS DOING THIS
+            const roles = data.map(({ rolesId, rolesTitle }) => ({ name: rolesTitle, value: rolesId}));
+            const employees = data.map(({ employeeId, first_name, last_name }) => ({ name: first_name + " " + last_name, value: employeeId}));
+            console.log(roles);
+            console.log(employees);
 
             inquirer.prompt([
                 {
