@@ -1,3 +1,5 @@
+-- Seed the different tables from the employees_db database
+
 INSERT INTO department (name) 
 VALUES
     ('Human Resources'),

@@ -17,7 +17,7 @@ const db = mysql.createConnection(
 
 // Connect to mySQL database
 db.connect(function (err) {
-    if (err) return console.log(err);
+    if (err) throw (err);
     // Call inquirerPrompt(), which is defined below
     inquirerPrompt();
 });
@@ -38,6 +38,7 @@ const inquirerPrompt = () => {
                 'Add a role',
                 'Add an employee',
                 'Update an employee role',
+                'Update employee manager',
                 'Exit'
             ]
         }
@@ -79,6 +80,11 @@ const inquirerPrompt = () => {
             updateEmployee();
         }
 
+        // If they selected "Update employee manager" in the inquirer.prompt section, this will take them to the function updateManager() which is defined later in the code and allows the user to update an employee's manager
+        if (choices === "Update employee manager") {
+            updateManager();
+        }
+
         // If they selected "Exit" in the inquirer.prompt section, this will end the connection to the database and quit
         if (choices === "Exit") {
             db.end();
@@ -95,7 +101,7 @@ viewDepartments = () => {
 
     // Here is the db query that will run the query defined in "const mysql"
     db.query(mysql, (err, rows) => {
-        if (err) return console.log(err);
+        if (err) throw (err);
 
         // Generate a formatted table with the information
         console.table(rows);
@@ -109,7 +115,7 @@ viewDepartments = () => {
 viewRoles = () => {
     console.log('Show all roles.');
 
-    // MySQL query that generates a table using the roles.id, roles.title, roles.salary, and department.name as department and roles.department_id as department.id
+    // MySQL query that generates a table using the roles.id, roles.title, roles.salary, and department.name as department
     const mysql = `SELECT roles.id, roles.title, roles.salary, department.name AS department FROM roles LEFT JOIN department ON roles.department_id = department.id`;
 
     db.query(mysql, (err, rows) => {
@@ -123,10 +129,10 @@ viewEmployees = () => {
     console.log('All employees are showing.');
 
     // mySQL query that displays the employee id, first name, last name, role, department, salary, and manager
-    const mysql = `SELECT employee.id, employee.first_name, employee.last_name, roles.title, department.name AS department, roles.salary, CONCAT(mgr.first_name, ' ', mgr.last_name) AS manager FROM employee LEFT JOIN roles ON employee.role_id = roles.id LEFT JOIN department ON roles.department_id = department.id LEFT JOIN employee mgr ON employee.manager_id = mgr.id`;
+    const mysql = `SELECT employee.id, employee.first_name, employee.last_name, roles.title, department.name AS department, roles.salary, CONCAT(manager.first_name, ' ', manager.last_name) AS manager FROM employee LEFT JOIN roles ON employee.role_id = roles.id LEFT JOIN department ON roles.department_id = department.id LEFT JOIN employee manager ON employee.manager_id = manager.id`;
 
     db.query(mysql, (err, rows) => {
-        if (err) return console.log(err);
+        if (err) throw (err);
         console.table(rows);
         inquirerPrompt();
     });
@@ -145,8 +151,8 @@ addDepartment = () => {
         // Query to insert the department to the department table
         const mysql = `INSERT INTO department (name) VALUES (?)`;
         db.query(mysql, answer.department, (err, results) => {
-            if (err) return console.log(err);
-            console.log('Added' + answer.department + "to departments");
+            if (err) throw (err);
+            console.log('Added ' + answer.department + ' to departments');
             // Display departments after added by calling viewDepartments();
             viewDepartments();
         });
@@ -176,7 +182,7 @@ addRole = () => {
         const roles_var = `SELECT name, id FROM department`;
 
         db.query(roles_var, (err, data) => {
-            if (err) return console.log(err);
+            if (err) throw (err);
             // Set name = the name of department and the value = the id of that department 
             const department_var = data.map(({ name, id }) => ({ name: name, value: id }));
 
@@ -199,7 +205,7 @@ addRole = () => {
                 const mysql = `INSERT INTO roles (title, salary, department_id) VALUES (?,?,?)`;
 
                 db.query(mysql, parameters, (err, result) => {
-                    if (err) return console.log(err);
+                    if (err) throw (err);
 
                     // Console.log confirmation of adding role
                     console.log('Added ' + answer.roles + ' to roles');
@@ -303,6 +309,7 @@ updateEmployee = () => {
             const employee = employeeChoice.name;
             // Declare "parameters"
             const parameters = [];
+
             // Add "employee" (which is the name of the selected employee) to "parameters"
             parameters.push(employee);
 
@@ -310,7 +317,7 @@ updateEmployee = () => {
             const role_var = `SELECT * FROM roles`;
 
             db.query(role_var, (err, data) => {
-                if (err) return console.log(err);
+                if (err) throw (err);
                 // Set the name = title of the role and value = id of the role
                 const roles = data.map(({ id, title }) => ({ name: title, value: id }));
 
@@ -341,10 +348,86 @@ updateEmployee = () => {
                     const mysql = `UPDATE employee SET role_id = ? WHERE id = ?`;
 
                     db.query(mysql, parameters, (err, result) => {
-                        if (err) return console.log(err);
+                        if (err) throw (err);
                         console.log('Role has been updated.');
 
                         // Display employees (and their roles) by calling viewEmployees()
+                        viewEmployees();
+                    });
+                });
+            });
+        });
+    });
+};
+
+
+// This function allows the user to update an employee's manager
+updateManager = () => {
+    // Query to select all employees from employee table
+    const employeemysql = `SELECT * FROM employee`;
+
+    db.query(employeemysql, (err, data) => {
+        if (err) throw (err);
+
+        // Set name = concatonation of first/last name and the value = the id the employee
+        const employee = data.map(({ id, first_name, last_name }) => ({ name: first_name + " " + last_name, value: id }));
+
+        // Ask the user which employee they want to update with the employees pulled from the above query as choices
+        inquirer.prompt([
+            {
+                type: 'list',
+                name: 'name',
+                message: 'Which employee do you want to update the manager for?',
+                choices: employee
+            }
+        ]).then(employeeChoice => {
+            const employee = employeeChoice.name;
+            // Declare "parameters"
+            const parameters = [];
+
+            // Add "employee" (which is the name of the selected employee) to "parameters"
+            parameters.push(employee);
+
+            // Query that selects all employees from employee
+            const employeemysql = `SELECT * FROM employee`;
+
+            db.query(employeemysql, (err, data) => {
+                if (err) throw (err);
+
+                // Set name = concatonation of first/last name and the value = the id the employee
+                const employee = data.map(({ id, first_name, last_name }) => ({ name: first_name + " " + last_name, value: id }));
+        
+                // Ask the user which employee they want to set as the manager with the employees pulled from the above query as choices
+                inquirer.prompt([
+                    {
+                        type: 'list',
+                        name: 'name',
+                        message: 'Which employee is the new manager?',
+                        choices: employee
+                    }
+                ]).then(managerChoice => {
+                    const manager = managerChoice.name;
+
+                    // Push the selected manager to "parameters"
+                    parameters.push(manager);
+
+                    // Set "employee" = the first element in the parameters array
+                    let employee = parameters[0]
+
+                    // Set the first element in parameters = the new manager 
+                    parameters[0] = manager
+
+                    // Set the second element in parameters = the employee (swapping the order so that we can use it in the right way below)
+                    parameters[1] = employee
+
+                    // Query that will update the employee's manager_id where the id = the employee's id
+                    const mysql = `UPDATE employee SET manager_id = ? WHERE id = ?`;
+
+                    db.query(mysql, parameters, (err, result) => {
+                        if (err) throw (err);
+                        console.log('Manager has been updated.');
+
+                        // Display employees (and their new manager) by calling viewEmployees()
                         viewEmployees();
                     });
                 });
